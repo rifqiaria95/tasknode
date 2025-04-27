@@ -1,4 +1,4 @@
-# Backend Express App
+# To Do App Menggunakan Node dan Express JS
 
 ## Installasi
 
@@ -8,6 +8,12 @@ npm install
 
 ## Start Server
 
+```bash
 npm index.js
+```
 
-## Buat file .env dan isi JWT_SECRET=mysecretkey123
+## Buat file .env di root folder dan isi
+
+```bash
+JWT_SECRET=mysecretkey123
+```
