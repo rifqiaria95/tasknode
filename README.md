@@ -1,4 +1,4 @@
-# To Do App Menggunakan Node dan Express JS
+# To Do App Menggunakan Node dan Express JS + MongoDB
 
 ## Installasi
 
