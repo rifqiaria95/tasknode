@@ -1,73 +1,148 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const bcrypt         = require('bcryptjs');
+const jwt            = require('jsonwebtoken');
+const User           = require('../models/UserModel');
 const BlacklistToken = require('../models/BlacklistToken');
-const ActiveToken = require('../models/ActiveToken');
+const ActiveToken    = require('../models/ActiveToken');
+const AppError       = require('../utils/AppError');
 
-// REGISTER user
-exports.register = async (req, res) => {
+// @desc    Register new user
+// @route   POST /api/auth/register
+// @access  Public
+exports.register = async (req, res, next) => {
   try {
-    const { username, password } = req.body;
+    const { name, email, password, role } = req.body;
 
-    const existingUser = await User.findOne({ username });
-    if (existingUser) return res.status(400).json({ message: 'Username sudah terpakai' });
+    // Validasi email unik
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return next(new AppError('Email sudah terdaftar', 400));
+    }
 
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    // Buat user baru
+    const user = await User.create({
+      name,
+      email,
+      password,
+      role: role || 'customer' // Default role customer
+    });
 
-    const newUser = new User({ username, password: hashedPassword });
-    await newUser.save();
+    // Jangan kirim password dalam response
+    user.password = undefined;
 
-    res.status(201).json({ message: 'Registrasi berhasil' });
+    // Generate token
+    const token = jwt.sign(
+      { id: user._id, role: user.role }, 
+      process.env.JWT_SECRET, 
+      { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
+    );
+
+    // Simpan token aktif
+    await ActiveToken.create({ token, userId: user._id });
+
+    res.status(201).json({
+      success: true,
+      token,
+      data: user
+    });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    next(err);
   }
 };
 
-// LOGIN user
-exports.login = async (req, res) => {
+// @desc    Login user
+// @route   POST /api/auth/login
+// @access  Public
+exports.login = async (req, res, next) => {
   try {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
 
-    const user = await User.findOne({ username });
-    if (!user) return res.status(400).json({ message: 'Username tidak ditemukan' });
+    // 1) Cek jika email dan password ada
+    if (!email || !password) {
+      return next(new AppError('Silakan masukkan email dan password', 400));
+    }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: 'Password salah' });
+    // 2) Cek jika user ada dan password benar
+    const user = await User.findOne({ email }).select('+password');
+    
+    if (!user || !(await user.correctPassword(password, user.password))) {
+      return next(new AppError('Email atau password salah', 401));
+    }
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
+    // 3) Generate token
+    const token = jwt.sign(
+      { id: user._id, role: user.role }, 
+      process.env.JWT_SECRET, 
+      { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
+    );
 
-    await ActiveToken.create({ token });
+    // 4) Simpan token aktif
+    await ActiveToken.create({ token, userId: user._id });
 
-    res.json({ token });
+    // 5) Kirim response
+    user.password = undefined;
+    
+    res.status(200).json({
+      success: true,
+      token,
+      data: user
+    });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    next(err);
   }
 };
 
-// LOGOUT user
-exports.logout = async (req, res) => {
+// @desc    Logout user
+// @route   POST /api/auth/logout
+// @access  Private
+exports.logout = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) {
-      return res.status(400).json({ message: 'Token tidak ditemukan' });
+      return next(new AppError('Token tidak ditemukan', 400));
     }
 
-    await BlacklistToken.create({ token });
+    // Tambahkan token ke blacklist
+    await BlacklistToken.create({ token, userId: req.user.id });
+    
+    // Hapus dari active tokens
     await ActiveToken.deleteOne({ token });
 
-    res.json({ message: 'Logout berhasil, token diblacklist' });
+    res.status(200).json({
+      success: true,
+      message: 'Logout berhasil'
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Terjadi kesalahan server' });
+    next(error);
   }
 };
 
-// GET jumlah user aktif
-exports.getActiveUserCount = async (req, res) => {
+// @desc    Get jumlah user aktif
+// @route   GET /api/auth/active-users
+// @access  Private/Admin
+exports.getActiveUserCount = async (req, res, next) => {
   try {
     const count = await ActiveToken.countDocuments();
-    res.json({ activeUsers: count });
+    res.status(200).json({
+      success: true,
+      activeUsers: count
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Gagal menghitung user aktif' });
+    next(new AppError('Gagal menghitung user aktif', 500));
+  }
+};
+
+// @desc    Get current user profile
+// @route   GET /api/auth/me
+// @access  Private
+exports.getMe = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    
+    res.status(200).json({
+      success: true,
+      data: user
+    });
+  } catch (error) {
+    next(error);
   }
 };
