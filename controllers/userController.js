@@ -111,7 +111,7 @@ exports.deleteUser = async (req, res, next) => {
       return next(new AppError('User tidak ditemukan', 404));
     }
     
-    await user.remove();
+    await user.deleteOne();
     
     res.status(200).json({
       success: true,
