@@ -42,16 +42,17 @@ exports.getUser = async (req, res, next) => {
 // @access  Public
 exports.createUser = async (req, res, next) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, active } = req.body;
     
-    // Default role adalah customer kecuali jika admin yang membuat
-    const userRole = req.user && req.user.role === 'admin' ? role || 'customer' : 'customer';
+    // Default role adalah user kecuali jika admin yang membuat
+    const userRole = req.user && req.user.role === 'admin' ? role || 'user' : 'user';
     
     const user = await User.create({
       name,
       email,
       password,
-      role: userRole
+      role: userRole,
+      active,
     });
     
     // Jangan kirim password dalam response
@@ -77,12 +78,13 @@ exports.updateUser = async (req, res, next) => {
       return next(new AppError('User tidak ditemukan', 404));
     }
     
-    const { name, email, address, phone } = req.body;
+    const { name, email, address, phone, active } = req.body;
     
     user.name      = name || user.name;
     user.email     = email || user.email;
     user.address   = address || user.address;
     user.phone     = phone || user.phone;
+    user.active    = active !== undefined ? active : user.active;
     user.updatedAt = Date.now();
     
     await user.save();

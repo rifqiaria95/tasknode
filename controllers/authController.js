@@ -23,7 +23,7 @@ exports.register = async (req, res, next) => {
       name,
       email,
       password,
-      role: role || 'customer' // Default role customer
+      role: role || 'user' // Default role user
     });
 
     // Jangan kirim password dalam response
@@ -68,17 +68,22 @@ exports.login = async (req, res, next) => {
       return next(new AppError('Email atau password salah', 401));
     }
 
-    // 3) Generate token
+    // 3) Cek apakah user aktif
+    if (!user.active) {
+      throw new AppError('Akun Anda tidak aktif. Hubungi admin.', 403);
+    }
+
+    // 4) Generate token
     const token = jwt.sign(
       { id: user._id, role: user.role }, 
       process.env.JWT_SECRET, 
       { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
     );
 
-    // 4) Simpan token aktif
+    // 5) Simpan token aktif
     await ActiveToken.create({ token, userId: user._id });
 
-    // 5) Kirim response
+    // 6) Kirim response
     user.password = undefined;
     
     res.status(200).json({

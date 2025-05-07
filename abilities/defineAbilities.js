@@ -1,10 +1,10 @@
-const { AbilityBuilder, createMongoAbility } = require('@casl/ability');
+const { AbilityBuilder, Ability } = require('@casl/ability');
 const Role = require('../models/RoleModel');
 
 async function defineAbilitiesFor(user) {
-  const { can, rules } = new AbilityBuilder(createMongoAbility);
+  const { can, rules } = new AbilityBuilder(Ability);
 
-  const role = await Role.findById(user.role).populate('permissions');
+  const role = await Role.findOne({ name: user.role }).populate('permissions');
 
   if (role) {
     role.permissions.forEach(permission => {
@@ -12,7 +12,7 @@ async function defineAbilitiesFor(user) {
     });
   }
 
-  return createMongoAbility(rules);
+  return new Ability(rules);
 }
 
 module.exports = defineAbilitiesFor;

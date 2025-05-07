@@ -12,7 +12,7 @@ module.exports = (action, subject) => {
       }
       
       // Set abilities untuk user yang sedang login
-      req.ability = defineAbilitiesFor(req.user);
+      req.ability = await defineAbilitiesFor(req.user);
       
       // Jika action dan subject didefinisikan, lakukan pengecekan permission
       if (action && subject) {

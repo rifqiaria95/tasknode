@@ -28,19 +28,19 @@ const seed = async () => {
 
     // 2. Buat Role
     const adminRole = new Role({
-      name: 'admin',
+      name: 'superadmin',
       permissions: permissions.map(p => p._id),
     });
 
     const editorRole = new Role({
-      name: 'editor',
+      name: 'admin',
       permissions: permissions.filter(p =>
         ['create', 'read', 'update'].includes(p.action) && p.subject === 'Post'
       ).map(p => p._id),
     });
 
     const viewerRole = new Role({
-      name: 'viewer',
+      name: 'user',
       permissions: permissions.filter(p =>
         p.action === 'read'
       ).map(p => p._id),

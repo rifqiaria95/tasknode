@@ -23,8 +23,8 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum   : ['customer', 'seller', 'admin'],
-    default: 'customer'
+    enum   : ['user', 'admin', 'superadmin'],
+    default: 'user'
   },
   address: {
     type: String,
@@ -33,6 +33,10 @@ const userSchema = new mongoose.Schema({
   phone: {
     type: String,
     trim: true
+  },
+  active: {
+    type: Boolean,
+    default: true
   },
   createdAt: {
     type   : Date,
