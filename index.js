@@ -1,9 +1,13 @@
+require('dotenv').config();
+
 const express          = require('express');
 const cors             = require('cors');
 const mongoose         = require('mongoose');
 const morgan           = require('morgan');
 const cookieParser     = require('cookie-parser');
 const csrf             = require('csurf');
+const path             = require('path');
+const nodemailer       = require('nodemailer');
 const errorHandler     = require('./middlewares/errorHandler');
 const roleRouter       = require('./routes/role');
 const permissionRouter = require('./routes/permission');
@@ -15,6 +19,7 @@ const app  = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware dasar
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(cookieParser());

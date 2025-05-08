@@ -11,7 +11,9 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "rproject": "todo"
+    "rproject": "todo",
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
   "dependencies": {
     "@casl/ability": "^6.7.3",
@@ -28,6 +30,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.14.1",
     "morgan": "^1.10.0",
+    "nodemailer": "^7.0.3",
     "wilayah-indonesia": "^1.0.2"
   },
   "devDependencies": {

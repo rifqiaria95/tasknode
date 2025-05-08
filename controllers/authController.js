@@ -1,12 +1,14 @@
-const bcrypt         = require('bcryptjs');
-const jwt            = require('jsonwebtoken');
-const User           = require('../models/UserModel');
-const BlacklistToken = require('../models/BlacklistToken');
-const ActiveToken    = require('../models/ActiveToken');
-const AppError       = require('../utils/AppError');
+const bcrypt                    = require('bcryptjs');
+const jwt                       = require('jsonwebtoken');
+const crypto                    = require('crypto');
+const User                      = require('../models/UserModel');
+const BlacklistToken            = require('../models/BlacklistToken');
+const ActiveToken               = require('../models/ActiveToken');
+const AppError                  = require('../utils/AppError');
+const { sendVerificationEmail } = require('../services/emailService');
 
 // @desc    Register new user
-// @route   POST /api/auth/register
+// @route   POST /auth/register
 // @access  Public
 exports.register = async (req, res, next) => {
   try {
@@ -26,18 +28,24 @@ exports.register = async (req, res, next) => {
       role: role || 'user' // Default role user
     });
 
+    // Generate email verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+
+    // Simpan token dan expire date di user
+    user.emailVerificationToken = verificationToken;
+    user.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000; 
+    await user.save();
+
+    // Kirim email verifikasi
+    await sendVerificationEmail(user.email, verificationToken);
+
     // Jangan kirim password dalam response
     user.password = undefined;
 
-    // Generate token
-    const token = jwt.sign(
-      { id: user._id, role: user.role }, 
-      process.env.JWT_SECRET, 
-      { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
-    );
-
-    // Simpan token aktif
-    await ActiveToken.create({ token, userId: user._id });
+    // Generate token JWT
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRES_IN || '1d'
+    });
 
     res.status(201).json({
       success: true,
@@ -49,43 +57,70 @@ exports.register = async (req, res, next) => {
   }
 };
 
+// @desc    Verifikasi email
+// @route   GET /auth/verify-email/:token
+// @access  Public
+exports.verifyEmail = async (req, res, next) => {
+  try {
+    const { token } = req.params;
+
+    const user = await User.findOne({
+      emailVerificationToken: token,
+      emailVerificationExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return next(new AppError('Token tidak valid atau sudah kedaluwarsa', 400));
+    }
+
+    user.isEmailVerified = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Email berhasil diverifikasi. Silakan login.'
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // @desc    Login user
-// @route   POST /api/auth/login
+// @route   POST /auth/login
 // @access  Public
 exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    // 1) Cek jika email dan password ada
     if (!email || !password) {
       return next(new AppError('Silakan masukkan email dan password', 400));
     }
 
-    // 2) Cek jika user ada dan password benar
     const user = await User.findOne({ email }).select('+password');
-    
+
     if (!user || !(await user.correctPassword(password, user.password))) {
       return next(new AppError('Email atau password salah', 401));
     }
 
-    // 3) Cek apakah user aktif
-    if (!user.active) {
-      throw new AppError('Akun Anda tidak aktif. Hubungi admin.', 403);
+    if (!user.isEmailVerified) {
+      return next(new AppError('Silakan verifikasi email terlebih dahulu', 403));
     }
 
-    // 4) Generate token
+    if (!user.active) {
+      return next(new AppError('Akun Anda tidak aktif. Hubungi admin.', 403));
+    }
+
     const token = jwt.sign(
-      { id: user._id, role: user.role }, 
-      process.env.JWT_SECRET, 
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
     );
 
-    // 5) Simpan token aktif
     await ActiveToken.create({ token, userId: user._id });
-
-    // 6) Kirim response
     user.password = undefined;
-    
+
     res.status(200).json({
       success: true,
       token,
@@ -97,7 +132,7 @@ exports.login = async (req, res, next) => {
 };
 
 // @desc    Logout user
-// @route   POST /api/auth/logout
+// @route   POST /auth/logout
 // @access  Private
 exports.logout = async (req, res, next) => {
   try {
@@ -106,10 +141,7 @@ exports.logout = async (req, res, next) => {
       return next(new AppError('Token tidak ditemukan', 400));
     }
 
-    // Tambahkan token ke blacklist
     await BlacklistToken.create({ token, userId: req.user.id });
-    
-    // Hapus dari active tokens
     await ActiveToken.deleteOne({ token });
 
     res.status(200).json({
@@ -122,7 +154,7 @@ exports.logout = async (req, res, next) => {
 };
 
 // @desc    Get jumlah user aktif
-// @route   GET /api/auth/active-users
+// @route   GET /auth/active-users
 // @access  Private/Admin
 exports.getActiveUserCount = async (req, res, next) => {
   try {
@@ -137,12 +169,12 @@ exports.getActiveUserCount = async (req, res, next) => {
 };
 
 // @desc    Get current user profile
-// @route   GET /api/auth/me
+// @route   GET /auth/me
 // @access  Private
 exports.getMe = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
-    
+
     res.status(200).json({
       success: true,
       data: user
