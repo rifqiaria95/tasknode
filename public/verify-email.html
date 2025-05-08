@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Verifikasi Email</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #f7f7f7;
+      padding: 2rem;
+      text-align: center;
+    }
+    .container {
+      max-width: 500px;
+      margin: auto;
+      background: #fff;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    button {
+      background-color: #112655;
+      color: white;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 1rem;
+    #status {
+      margin-top: 1rem;
+      font-weight: bold;
+    }
+    .input-token {
+      width: 100%;
+      padding: 10px;
+    }
+    }
+  </style>
+  <div class="container">
+    <h2>Verifikasi Email Dummy</h2>
+    <p>Masukkan token verifikasi email kamu:</p>
+    <input type="text" id="tokenInput" placeholder="Token verifikasi..." style="width:100%;padding:10px;">
+    <button onclick="verify()">Verifikasi</button>
+    <p id="status"></p>
+  </div>
+
+  <script>
+    async function verify() {
+      const token = document.getElementById("tokenInput").value.trim();
+      const statusEl = document.getElementById("status");
+      if (!token) {
+        statusEl.innerText = 'Token tidak boleh kosong';
+        return;
+      }
+
+      statusEl.innerText = 'Memverifikasi...';
+
+      try {
+        const res = await fetch(`http://localhost:3001/auth/verify-email/${token}`);
+        const data = await res.json();
+
+        if (res.ok) {
+          statusEl.innerText = data.message;
+          statusEl.style.color = 'green';
+        } else {
+          statusEl.innerText = data.message || 'Gagal verifikasi';
+          statusEl.style.color = 'red';
+        }
+      } catch (err) {
+        statusEl.innerText = 'Terjadi kesalahan saat koneksi ke server';
+        statusEl.style.color = 'red';
+      }
+    }
+  </script>
+</body>
+</html>
