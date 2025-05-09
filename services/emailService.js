@@ -1,5 +1,5 @@
-const fs = require('fs');
-const path = require('path');
+const fs         = require('fs');
+const path       = require('path');
 const nodemailer = require('nodemailer');
 
 // Buat transporter Mailtrap
@@ -17,7 +17,7 @@ const sendVerificationEmail = async (email, verificationToken) => {
   const verificationUrl = `http://localhost:3001/auth/verify-email/${verificationToken}`;
 
   // Ambil isi file HTML dari public/verify-email.html
-  const filePath     = path.join(__dirname, 'public', 'verify-email.html');
+  const filePath     = path.join(__dirname, '..', 'public', 'verify-email.html');
   let   htmlTemplate = fs.readFileSync(filePath, 'utf-8');
 
   // Opsional: Ganti placeholder di HTML dengan token/link
